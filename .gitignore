@@ -1,3 +1,6 @@
 .env
 requirements.txt
 .venv
+test.db
+.idea
+.git
