@@ -40,9 +40,9 @@ class FriendResponse(BaseModel):
 
 class UserProfile(BaseModel):
     username: str
-    password: str
     name: Optional[str] = Field(None)
     email: EmailStr
+    phone: Optional[str] = Field(None)
     filename: Optional[str] = Field(None)
 
 

@@ -20,8 +20,8 @@ def get_user_by_token(token: str, db: Session, return_pedic=False) -> UserProfil
         if return_pedic:
             return UserProfile(
                 username=user.username,
-                password=user.password,
                 name=user.name,
+                phone=user.phone,
                 email=user.email,
                 filename=user.filename
             )
@@ -31,12 +31,10 @@ def get_user_by_token(token: str, db: Session, return_pedic=False) -> UserProfil
         return None
 
 
-
 def update_user_field(db: Session, current_user: User, field: str, value: str):
-    # user = db.query(User).filter(User.username == username).first()
 
     if field == 'password':
-        pass # Вызываем функцию изменяющую парольчик
+        pass
         print('ПОМЕНЯЛ ПАРОЛЬЧИК ТИПА')
     else:
         setattr(current_user, field, value)
