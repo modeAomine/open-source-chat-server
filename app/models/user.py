@@ -10,7 +10,7 @@ from app.models.user_friends import Friendship
 
 class Roles(PyEnum):
     USER = "Пользователь"
-    SUPPORT = "Потдержка"
+    SUPPORT = "Поддержка"
     ADMIN = "Администратор"
 
 
