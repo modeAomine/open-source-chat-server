@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
 
+
 class Friendship(Base):
     __tablename__ = 'friendships'
 
@@ -9,5 +10,5 @@ class Friendship(Base):
     user_id = Column(Integer, ForeignKey('users.id'), index=True)
     friend_id = Column(Integer, ForeignKey('users.id'), index=True)
 
-    user = relationship("User", foreign_keys=[user_id])
+    user = relationship("User", foreign_keys=[user_id], back_populates="friendships")
     friend = relationship("User", foreign_keys=[friend_id])

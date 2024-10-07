@@ -67,3 +67,21 @@ class AvatarUpdate(BaseModel):
 
 class SettingsURL(BaseModel):
     BASE_URL: str = "http://127.0.0.1:8000"
+
+
+class UserSettings(BaseModel):
+    user_id: int
+    two_step_verification: bool = None
+    message_deletion_time: str = None
+    local_password: str = None
+    blocked_user: str = None
+    phone_visibility: str = None
+    last_seen_visibility: str = None
+    profile_photo_visibility: str = None
+    bio_visibility: str = None
+    message_permissions: str = None
+    call_permission: str = None
+    chat_invitations: str = None
+
+    class Config:
+        orm_model = True

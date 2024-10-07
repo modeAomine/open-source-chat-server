@@ -1,13 +1,14 @@
 import os
 import uuid
 
-from fastapi import UploadFile, HTTPException
+from fastapi import UploadFile, HTTPException, Depends
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 
 from app.config import settings
+from app.database import get_db
 from app.models.user import User
-from app.schemas import UserProfile
+from app.schemas import UserProfile, UserSettings
 
 
 def get_user_by_token(token: str, db: Session, return_pedic=False) -> UserProfile:

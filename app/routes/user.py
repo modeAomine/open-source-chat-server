@@ -1,13 +1,16 @@
 import os
+from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from sqlalchemy.orm import Session
+from starlette.websockets import WebSocket
 
 from app import schemas
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
-from app.schemas import UserProfile, UpdateUserFieldRequest, ResponseMessage, AvatarUpdate, SettingsURL
+from app.schemas import UserProfile, UpdateUserFieldRequest, ResponseMessage, AvatarUpdate, SettingsURL, UserSettings
+from app.services.settings_services import get_user_profile
 from app.services.user_services import get_user_by_token, update_user_field, save_avatar, update_user_avatar
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.exc import IntegrityError
@@ -67,3 +70,8 @@ def get_user_avatar(user_id: int, db: Session = Depends(get_db)):
         return avatar_url
 
     raise HTTPException(status_code=404, detail="Аватар не найден!")
+
+
+@router.get("/{user_id}/profile", response_model=UserProfile)
+def fetch_user_profile(user_id: int, current_user: UserProfile = Depends(get_current_user), db: Session = Depends(get_db)):
+    return get_user_profile(user_id, current_user.id, db)

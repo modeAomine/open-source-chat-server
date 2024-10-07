@@ -10,7 +10,6 @@ from datetime import timedelta, datetime
 from fastapi.security import OAuth2PasswordBearer
 from app.config import settings
 from app.models.session import Session
-from app.utils.matrix import generate_unitary_matrix
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")

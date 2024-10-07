@@ -31,6 +31,13 @@ user_status = Table(
     Column('status', Enum(UserStatus))
 )
 
+user_friends = Table(
+    'user_friends',
+    Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id')),
+    Column('friend_id', Integer, ForeignKey('users.id'))
+)
+
 
 class User(Base):
     __tablename__ = "users"
@@ -51,10 +58,21 @@ class User(Base):
     role = Column(Enum(Roles), default=Roles.USER)
     status = Column(Enum(UserStatus), default=UserStatus.INACTIVE)
 
-    sessions = relationship("Session", back_populates="user")
-    friends = relationship("Friendship", foreign_keys=[Friendship.user_id], back_populates="user")
-    friend_of = relationship("Friendship", foreign_keys=[Friendship.friend_id], back_populates="friend")
-    settings = relationship("UserSettings", uselist=False, back_populates="user")
+    sessions = relationship(
+        "Session",
+        back_populates="user")
+    friendships = relationship(
+        "Friendship",
+        foreign_keys=[Friendship.user_id],
+        back_populates="user")
+    friends = relationship(
+        "Friendship",
+        foreign_keys=[Friendship.friend_id],
+        back_populates="friend")
+    settings = relationship(
+        "UserSettings",
+        uselist=False,
+        back_populates="user")
 
     def __repr__(self):
         return f"User(id={self.id}, username={self.username}, email={self.email})"
