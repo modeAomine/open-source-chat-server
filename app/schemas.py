@@ -43,6 +43,7 @@ class UserProfile(BaseModel):
     name: Optional[str] = Field(None)
     email: EmailStr
     phone: Optional[str] = Field(None)
+    bio: Optional[str] = Field(None)
     filename: Optional[str] = Field(None)
 
 
@@ -53,3 +54,11 @@ class UpdateUserFieldRequest(BaseModel):
 
 class ResponseMessage(BaseModel):
     message: str
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+class AvatarUpdate(BaseModel):
+    filename: Optional[str] = Field(None)

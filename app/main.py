@@ -1,5 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
+
+from app.config import settings
 from app.database import engine, Base
 from app.routes import auth, user, token
 import time
@@ -25,6 +28,7 @@ Base.metadata.create_all(bind=engine)
 app.include_router(user.router, prefix="/user", tags=["user"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(token.router, prefix="/token", tags=["token"])
+app.mount("/avatars", StaticFiles(directory=settings.AVATAR_UPLOAD_DIR), name="avatars")
 
 
 @app.middleware("http")

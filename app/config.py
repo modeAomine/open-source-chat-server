@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     REFRESH_TOKEN_EXPIRE_DAYS: int
+    AVATAR_UPLOAD_DIR: str
 
     class Config:
         env_file = os.path.join(os.path.dirname(__file__), '../.env')

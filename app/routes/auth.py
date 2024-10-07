@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.models.user import User
+from app.routes.user import get_current_user
 from app.schemas import UserCreate, UserLogin, Token
 from app.services.auth_services import create_user, authenticate_user
 from app.services.token_services import create_access_token, create_refresh_token
@@ -58,10 +60,11 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.post("/logout")
-def logout(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    db_session = db.query(Session).filter(Session.access_token == token).first()
-    if db_session:
-        db.delete(db_session)
+def logout_user(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        db.query(Session).filter(Session.user_id == current_user.id).delete()
         db.commit()
-
-    return {"message": "Successfully logged out"}
+        return {"message": "Вы успешно вышли"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Ошибка выхода")

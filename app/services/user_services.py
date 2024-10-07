@@ -1,3 +1,5 @@
+import os
+from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 
@@ -22,8 +24,8 @@ def get_user_by_token(token: str, db: Session, return_pedic=False) -> UserProfil
                 username=user.username,
                 name=user.name,
                 phone=user.phone,
+                bio=user.bio,
                 email=user.email,
-                filename=user.filename
             )
 
         return user
@@ -42,3 +44,33 @@ def update_user_field(db: Session, current_user: User, field: str, value: str):
     db.commit()
     return current_user
 
+
+def save_avatar(file: UploadFile, user_id: int) -> str:
+    try:
+        print("Получаем файл:", file.filename)
+        file_ext = file.filename.split('.')[-1]
+        user_dir = os.path.join(settings.AVATAR_UPLOAD_DIR, str(user_id))
+        file_path = os.path.join(user_dir, f"{user_id}.{file_ext}")
+
+        os.makedirs(user_dir, exist_ok=True)
+        print("Сохраняем файл по пути:", file_path)
+
+        with open(file_path, 'wb') as buffer:
+            buffer.write(file.file.read())
+        print("Файл успешно сохранен.")
+
+        return file_path
+    except Exception as e:
+        print("Ошибка:", e)
+        raise HTTPException(status_code=500, detail=f"Ошибка сохранения файла: {e}")
+
+
+def update_user_avatar(db: Session, user_id: int, avatar_url: str):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"Пользователь не найден!")
+
+    user.filename = avatar_url
+    db.commit()
+    db.refresh(user)
+    return user

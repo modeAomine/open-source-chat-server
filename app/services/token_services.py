@@ -55,14 +55,13 @@ def refresh_user_token(refresh_token: str):
             data={"sub": payload.get("sub")},
             expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
-        new_refresh_token = create_refresh_token(
-            data={"sub": payload.get("sub")},
-            expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        )
+        # new_refresh_token = create_refresh_token(
+        #     data={"sub": payload.get("sub")},
+        #     expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        # )
 
         return {
             "access_token": new_access_token,
-            "refresh_token": new_refresh_token,
             "token_type": "bearer"
         }
     except JWTError:

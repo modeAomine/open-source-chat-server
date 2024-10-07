@@ -7,7 +7,7 @@ import os
 from datetime import timedelta, datetime
 
 from app.models.session import Session
-from app.schemas import Token
+from app.schemas import Token, RefreshTokenRequest
 from app.services.token_services import create_refresh_token, create_access_token
 from app.utils.matrix import generate_unitary_matrix
 
@@ -15,7 +15,8 @@ router = APIRouter()
 
 
 @router.post("/refresh", response_model=Token)
-def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
+def refresh_token(request: RefreshTokenRequest, db: Session = Depends(get_db)):
+    refresh_token = request.refresh_token
     try:
         session = db.query(Session).filter(Session.refresh_token == refresh_token).first()
         if not session:
@@ -25,21 +26,19 @@ def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Refresh token expired")
 
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-
         new_access_token = create_access_token(
             data={"sub": str(session.user_id)},
             expires_delta=access_token_expires
         )
+
         new_refresh_token = create_refresh_token(
             data={"sub": str(session.user_id)},
-            expires_delta=refresh_token_expires
+            expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         )
-
         session.refresh_token = new_refresh_token
-        session.expires_at = datetime.utcnow() + refresh_token_expires
+        session.expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         db.commit()
 
         return Token(access_token=new_access_token, refresh_token=new_refresh_token)
     except Exception as e:
-        raise HTTPException(status_code=400, detail="Ошибка генерации refresh_token")
+        raise HTTPException(status_code=400, detail="Ошибка генерации access_token")
