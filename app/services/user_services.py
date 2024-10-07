@@ -1,4 +1,6 @@
 import os
+import uuid
+
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
@@ -21,6 +23,7 @@ def get_user_by_token(token: str, db: Session, return_pedic=False) -> UserProfil
 
         if return_pedic:
             return UserProfile(
+                id=user.id,
                 username=user.username,
                 name=user.name,
                 phone=user.phone,
@@ -49,8 +52,9 @@ def save_avatar(file: UploadFile, user_id: int) -> str:
     try:
         print("Получаем файл:", file.filename)
         file_ext = file.filename.split('.')[-1]
+        random_filename = f"{uuid.uuid4()}.{file_ext}"
         user_dir = os.path.join(settings.AVATAR_UPLOAD_DIR, str(user_id))
-        file_path = os.path.join(user_dir, f"{user_id}.{file_ext}")
+        file_path = os.path.join(user_dir, random_filename)
 
         os.makedirs(user_dir, exist_ok=True)
         print("Сохраняем файл по пути:", file_path)

@@ -39,6 +39,7 @@ class FriendResponse(BaseModel):
 
 
 class UserProfile(BaseModel):
+    id: int
     username: str
     name: Optional[str] = Field(None)
     email: EmailStr
@@ -62,3 +63,7 @@ class RefreshTokenRequest(BaseModel):
 
 class AvatarUpdate(BaseModel):
     filename: Optional[str] = Field(None)
+
+
+class SettingsURL(BaseModel):
+    BASE_URL: str = "http://127.0.0.1:8000"

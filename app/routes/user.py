@@ -3,10 +3,11 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 
+from app import schemas
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
-from app.schemas import UserProfile, UpdateUserFieldRequest, ResponseMessage, AvatarUpdate
+from app.schemas import UserProfile, UpdateUserFieldRequest, ResponseMessage, AvatarUpdate, SettingsURL
 from app.services.user_services import get_user_by_token, update_user_field, save_avatar, update_user_avatar
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.exc import IntegrityError
@@ -61,7 +62,8 @@ def get_user_avatar(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Пользователь не найден!")
 
     if user.filename:
-        avatar_url = f"/{settings.AVATAR_UPLOAD_DIR}/{user_id}/{user.filename}"
+        avatar_url = f"http://127.0.0.1:8000/{user.filename}"
+        avatar_url = avatar_url.replace("\\", "/")
         return avatar_url
 
     raise HTTPException(status_code=404, detail="Аватар не найден!")
