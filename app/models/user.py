@@ -31,13 +31,6 @@ user_status = Table(
     Column('status', Enum(UserStatus))
 )
 
-user_friends = Table(
-    'user_friends',
-    Base.metadata,
-    Column('user_id', Integer, ForeignKey('users.id')),
-    Column('friend_id', Integer, ForeignKey('users.id'))
-)
-
 
 class User(Base):
     __tablename__ = "users"
