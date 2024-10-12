@@ -32,6 +32,7 @@ app.mount("/avatars", StaticFiles(directory=settings.AVATAR_UPLOAD_DIR), name="a
 app.include_router(s.router, prefix="/settings", tags=["settings"])
 app.include_router(socket.router, prefix="/socket", tags=["socket"])
 app.include_router(friends.router, prefix="/friends", tags=["friends"])
+app.include_router(socket.router, prefix="/chat", tags=["chat"])
 
 
 @app.middleware("http")

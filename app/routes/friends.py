@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import or_
+
 from app.models.session import Session
-from sqlalchemy.sql import crud
 
 from app.database import get_db
 from app.models.user import User
 from app.models.user_friends import Friendship, FriendshipStatus
 from app.routes.user import get_current_user
+from app.schemas import SettingsURL
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -19,13 +21,18 @@ def add_friend(friend_id: int, token: str = Depends(oauth2_scheme), db: Session 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     existing_friendship = db.query(Friendship).filter(
-        Friendship.user_id == user.id, Friendship.friend_id == friend_id
+        Friendship.requester_id == user.id, Friendship.receiver_id == friend_id
     ).first()
 
     if existing_friendship:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Friend request already sent or confirmed")
 
-    new_friendship = Friendship(user_id=user.id, friend_id=friend_id, status=FriendshipStatus.PENDING)
+    new_friendship = Friendship(
+        requester_id=user.id,
+        receiver_id=friend_id,
+        requester_status=FriendshipStatus.WAITING,
+        receiver_status=FriendshipStatus.PENDING
+    )
     db.add(new_friendship)
     db.commit()
 
@@ -38,15 +45,22 @@ def confirm_friendship(friendship_id: int, token: str = Depends(oauth2_scheme), 
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-    friendship = db.query(Friendship).filter(Friendship.id == friendship_id, Friendship.friend_id == user.id).first()
+    friendship = db.query(Friendship).filter(
+        Friendship.id == friendship_id,
+        Friendship.receiver_id == user.id
+    ).first()
 
     if not friendship:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Friendship not found")
 
-    if friendship.status == FriendshipStatus.CONFIRMED:
+    if friendship.receiver_status == FriendshipStatus.ACCEPTED:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Friendship already confirmed")
 
-    friendship.status = FriendshipStatus.CONFIRMED
+    if friendship.receiver_status != FriendshipStatus.PENDING:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Friendship not pending confirmation")
+
+    friendship.receiver_status = FriendshipStatus.ACCEPTED
+    friendship.requester_status = FriendshipStatus.ACCEPTED
     db.commit()
 
     return {"message": "Friendship confirmed"}
@@ -59,25 +73,48 @@ def get_all_friendships(db: Session = Depends(get_db), token: str = Depends(oaut
     if not user:
         raise HTTPException(status_code=400, detail="Invalid token")
 
-    friendships = (
-        db.query(Friendship)
-        .filter(Friendship.user_id == user.id)
-        .join(User, Friendship.friend_id == User.id)
-        .add_columns(User.id.label('friend_id'), User.username, User.filename, User.bio)
-        .all()
-    )
+
+    friendships = db.query(Friendship).filter(
+        or_(Friendship.requester_id == user.id, Friendship.receiver_id == user.id)
+    ).all()
 
     results = []
-    for friendship, friend_id, username, filename, bio in friendships:
+    for friendship in friendships:
+        if friendship.requester_id == user.id:
+            friend = db.query(User).filter(User.id == friendship.receiver_id).first()
+
+            if friendship.requester_status == FriendshipStatus.PENDING:
+                friendship_status = 'pending'
+            elif friendship.requester_status == FriendshipStatus.WAITING:
+                friendship_status = 'waiting'
+            elif friendship.requester_status == FriendshipStatus.ACCEPTED:
+                friendship_status = 'confirmed'
+            elif friendship.requester_status == FriendshipStatus.REJECTED:
+                friendship_status = 'rejected'
+            elif friendship.requester_status == FriendshipStatus.BLOCKED:
+                friendship_status = 'blocked'
+
+        else:
+            friend = db.query(User).filter(User.id == friendship.requester_id).first()
+
+            if friendship.receiver_status == FriendshipStatus.PENDING:
+                friendship_status = 'pending'
+            elif friendship.receiver_status == FriendshipStatus.WAITING:
+                friendship_status = 'waiting'
+            elif friendship.receiver_status == FriendshipStatus.ACCEPTED:
+                friendship_status = 'confirmed'
+            elif friendship.receiver_status == FriendshipStatus.REJECTED:
+                friendship_status = 'rejected'
+            elif friendship.receiver_status == FriendshipStatus.BLOCKED:
+                friendship_status = 'blocked'
+
         results.append({
             "id": friendship.id,
-            "friend_id": friend_id,
-            "username": username,
-            "filename": filename,
-            "bio": bio,
-            "status": friendship.status,
+            "friend_id": friend.id,
+            "username": friend.username,
+            "filename": f"http://127.0.0.1:8000/{friend.filename.replace('\\', '/')}" if friend.filename else None,
+            "bio": friend.bio,
+            "status": friendship_status,
         })
 
     return results
-
-

@@ -53,19 +53,23 @@ class User(Base):
 
     sessions = relationship(
         "Session",
-        back_populates="user")
-    friendships = relationship(
+        back_populates="user"
+    )
+    sent_friendships = relationship(
         "Friendship",
-        foreign_keys=[Friendship.user_id],
-        back_populates="user")
-    friends = relationship(
+        foreign_keys=[Friendship.requester_id],
+        back_populates="requester"
+    )
+    received_friendships = relationship(
         "Friendship",
-        foreign_keys=[Friendship.friend_id],
-        back_populates="friend")
+        foreign_keys=[Friendship.receiver_id],
+        back_populates="receiver"
+    )
     settings = relationship(
         "UserSettings",
         uselist=False,
-        back_populates="user")
+        back_populates="user"
+    )
 
     def __repr__(self):
         return f"User(id={self.id}, username={self.username}, email={self.email})"
