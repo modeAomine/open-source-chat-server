@@ -1,21 +1,13 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum, Table, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean
+from sqlalchemy.sql import func
 from app.database import Base
 from enum import Enum as PyEnum
-from datetime import datetime
 
 
 class MessageStatus(PyEnum):
-    SENT = "Отправлено"
-    DELIVERED = "Доставлено"
-    READ = "Прочитано"
-
-
-message_status = Table(
-    'message_status', Base.metadata,
-    Column('chat_message_id', Integer, ForeignKey('chat_message.id')),
-    Column('status', Enum(MessageStatus))
-)
+    SENT = "SENT"
+    DELIVERED = "DELIVERED"
+    READ = "READ"
 
 
 class ChatMessage(Base):
@@ -26,5 +18,6 @@ class ChatMessage(Base):
     sender_id = Column(String)
     recipient_id = Column(String)
     text = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=func.now())
     message_statuses = Column(Enum(MessageStatus), default=MessageStatus.SENT)
+    is_deleted = Column(Boolean, default=False)

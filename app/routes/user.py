@@ -10,6 +10,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.user import User
 from app.schemas import UserProfile, UpdateUserFieldRequest, ResponseMessage, AvatarUpdate, SettingsURL, UserSettings
+from app.services.chat_services import get_chat_messages
 from app.services.settings_services import get_user_profile
 from app.services.user_services import get_user_by_token, update_user_field, save_avatar, update_user_avatar
 from fastapi.security import OAuth2PasswordBearer
@@ -75,3 +76,18 @@ def get_user_avatar(user_id: int, db: Session = Depends(get_db)):
 @router.get("/{user_id}/profile", response_model=UserProfile)
 def fetch_user_profile(user_id: int, current_user: UserProfile = Depends(get_current_user), db: Session = Depends(get_db)):
     return get_user_profile(user_id, current_user.id, db)
+
+
+@router.get("/get/chat_message/{chat_id}")
+async def get_messages(chat_id: str, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    get_current_user(token, db)
+    messages = get_chat_messages(db, chat_id)
+    return messages
+
+
+@router.post("/api/users/info")
+def get_users_info(user_ids: list[int], db: Session = Depends(get_db)):
+    users = db.query(User).filter(User.id.in_(user_ids)).all()
+    if not users:
+        raise HTTPException(status_code=404, detail="Пользователи не найдены")
+    return [{"id": user.id, "username": user.username, "filename": user.filename} for user in users]

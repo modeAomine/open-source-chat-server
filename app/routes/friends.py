@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 
+from app.models.chat_room import ChatRoom
 from app.models.session import Session
 
 from app.database import get_db
@@ -73,7 +74,6 @@ def get_all_friendships(db: Session = Depends(get_db), token: str = Depends(oaut
     if not user:
         raise HTTPException(status_code=400, detail="Invalid token")
 
-
     friendships = db.query(Friendship).filter(
         or_(Friendship.requester_id == user.id, Friendship.receiver_id == user.id)
     ).all()
@@ -93,7 +93,6 @@ def get_all_friendships(db: Session = Depends(get_db), token: str = Depends(oaut
                 friendship_status = 'rejected'
             elif friendship.requester_status == FriendshipStatus.BLOCKED:
                 friendship_status = 'blocked'
-
         else:
             friend = db.query(User).filter(User.id == friendship.requester_id).first()
 
@@ -108,6 +107,18 @@ def get_all_friendships(db: Session = Depends(get_db), token: str = Depends(oaut
             elif friendship.receiver_status == FriendshipStatus.BLOCKED:
                 friendship_status = 'blocked'
 
+        sender_id = str(user.id)
+        recipient_id = str(friend.id)
+
+        chat_room = db.query(ChatRoom).filter(
+            or_(
+                and_(ChatRoom.sender_id == sender_id, ChatRoom.recipient_id == recipient_id),
+                and_(ChatRoom.sender_id == recipient_id, ChatRoom.recipient_id == sender_id)
+            )
+        ).first()
+
+        chat_id = chat_room.chat_id if chat_room else None
+
         results.append({
             "id": friendship.id,
             "friend_id": friend.id,
@@ -115,6 +126,9 @@ def get_all_friendships(db: Session = Depends(get_db), token: str = Depends(oaut
             "filename": f"http://127.0.0.1:8000/{friend.filename.replace('\\', '/')}" if friend.filename else None,
             "bio": friend.bio,
             "status": friendship_status,
+            "chat": {
+                "chat_id": chat_id
+            }
         })
 
     return results

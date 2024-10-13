@@ -32,15 +32,8 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 
     data = {"sub": db_user.username}
 
-    access_token = create_access_token(
-        data=data,
-        expires_delta=access_token_expires
-    )
-
-    refresh_token = create_refresh_token(
-        data=data,
-        expires_delta=refresh_token_expires
-    )
+    access_token = create_access_token(data=data, expires_delta=access_token_expires)
+    refresh_token = create_refresh_token(data=data, expires_delta=refresh_token_expires)
 
     db_session = Session(
         user_id=db_user.id,
