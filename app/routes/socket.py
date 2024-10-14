@@ -8,7 +8,7 @@ from app.models.chat_message import MessageStatus
 from app.models.session import Session
 from app.models.user import User
 from app.services.chat_services import create_chat_room, send_message_and_notify, mark_messages_as_read, \
-    update_message_status
+    update_message_status, send_group_message
 from app.services.user_services import get_user_by_token
 
 router = APIRouter()
@@ -114,3 +114,45 @@ async def websocket_endpoint(
         manager.disconnect(str(user.id))
         await manager.broadcast(f"Пользователь {user.username} покинул чат")
 
+
+@router.websocket("/ws/group_chat/{group_chat_id}")
+async def group_chat(
+        websocket: WebSocket,
+        group_chat_id: str,
+        token: str,
+        db: Session = Depends(get_db)
+):
+    user = get_user_by_token(token, db)
+    if not user:
+        await websocket.close(code=4001, reason="Хуевый токен")
+        return
+
+    await manager.connect(websocket, str(user.ud))
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            message_data = json.loads(data)
+
+            if message_data.get("type") == "send_message":
+                text = message_data.get("text", "")
+                timestamp = message_data.get("time", datetime.utcnow())
+
+                message = send_group_message(
+                    db,
+                    group_chat_id,
+                    sender_id=str(user.id),
+                    text=text,
+                    timestamp=datetime.utcnow()
+                )
+
+                payload = json.dumps({
+                    "sender_id": str(user.id),
+                    "text": message.text,
+                    "timestamp": message.timestamp.isoformat()
+                })
+
+                await manager.broadcast(payload)
+
+    except WebSocketDisconnect:
+        manager.disconnect(str(user.id))

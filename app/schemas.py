@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -85,3 +85,8 @@ class UserSettings(BaseModel):
 
     class Config:
         orm_model = True
+
+
+class CreateGroupChatRequest(BaseModel):
+    user_ids: List[str]
+    group_name: str

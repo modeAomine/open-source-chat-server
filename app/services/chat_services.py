@@ -1,13 +1,15 @@
 import json
+import uuid
 from datetime import datetime
 from sqlalchemy import desc
 from app.models.chat_message import ChatMessage, MessageStatus
 from app.models.chat_notification import ChatNotification
 from app.models.chat_room import ChatRoom
+from app.models.group_chat_room import GroupChatRoom
+from app.models.group_chat_message import GroupChatMessage
 from app.models.session import Session
+from app.models.user import User
 
-# Удалите глобальный импорт manager
-# from app.routes.socket import manager
 
 def create_chat_room(db: Session, sender_id: str, recipient_id: str) -> ChatRoom:
     sender_id = str(sender_id)
@@ -28,13 +30,15 @@ def create_chat_room(db: Session, sender_id: str, recipient_id: str) -> ChatRoom
     return new_chat_room
 
 
-def send_message_and_notify(db: Session, chat_room_id: str, sender_id: str, recipient_id: str, text: str, timestamp: datetime, sender_username: str) -> (ChatMessage, ChatNotification):
+def send_message_and_notify(db: Session, chat_room_id: str, sender_id: str, recipient_id: str, text: str,
+                            timestamp: datetime, sender_username: str) -> (ChatMessage, ChatNotification):
     message = send_message(db, chat_room_id, sender_id, recipient_id, text, timestamp)
     notification = notify_sender(db, sender_id, sender_username)
     return message, notification
 
 
-def send_message(db: Session, chat_room_id: str, sender_id: str, recipient_id: str, text: str, timestamp: datetime) -> ChatMessage:
+def send_message(db: Session, chat_room_id: str, sender_id: str, recipient_id: str, text: str,
+                 timestamp: datetime) -> ChatMessage:
     new_message = ChatMessage(
         chat_room_id=chat_room_id,
         sender_id=sender_id,
@@ -97,10 +101,8 @@ async def mark_messages_as_read(db: Session, chat_room_id: str, recipient_id: st
         db.commit()
         db.refresh(message)
 
-        # Перемещаем импорт manager внутрь функции
         from app.routes.socket import manager
 
-        # Уведомляем отправителя, что сообщение было прочитано
         await manager.send_personal_message(
             json.dumps({
                 "type": "message_read",
@@ -109,3 +111,64 @@ async def mark_messages_as_read(db: Session, chat_room_id: str, recipient_id: st
             }),
             message.sender_id
         )
+
+
+""" 
+Функциии для гурпового чата: 
+"""
+
+
+def create_group_chat_room(db: Session, creator_id: str, user_ids: list[str], group_name: str) -> GroupChatRoom:
+    creator_id = str(creator_id)
+    user_ids = [str(user_id) for user_id in user_ids]
+
+    new_group_chat = GroupChatRoom(
+        group_chat_id=str(uuid.uuid4()),
+        group_name=group_name,
+        creator_id=creator_id,
+        created_at=datetime.now()
+    )
+
+    db.add(new_group_chat)
+    db.commit()
+    db.refresh(new_group_chat)
+
+    creator_user = db.query(User).filter(User.id == creator_id).first()
+    if creator_user:
+        new_group_chat.users.append(creator_user)
+
+    for user_id in user_ids:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            new_group_chat.users.append(user)
+
+    db.commit()
+    return new_group_chat
+
+
+def add_user_to_group_chat(db: Session, group_chat_id: str, user_id: str) -> GroupChatRoom:
+    group_chat = db.query(GroupChatRoom).filter(GroupChatRoom.id == group_chat_id).first()
+
+    if group_chat:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user not in group_chat.users:
+            group_chat.users.append(user)
+            db.commit()
+
+    return group_chat
+
+
+def send_group_message(db: Session, group_chat_id: str, sender_id: str, text: str, timestamp: datetime) -> GroupChatMessage:
+    new_message = GroupChatMessage(
+        group_chat_id=group_chat_id,
+        sender_id=sender_id,
+        text=text,
+        timestamp=timestamp,
+        message_statuses=MessageStatus.SENT
+    )
+
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+
+    return new_message

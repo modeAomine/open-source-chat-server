@@ -4,7 +4,7 @@ from app.database import Base
 from enum import Enum as PyEnum
 from datetime import datetime
 
-from app.models import user_friends
+from app.models.group_chat_room import group_chat_users
 from app.models.user_friends import Friendship
 
 
@@ -51,25 +51,12 @@ class User(Base):
     role = Column(Enum(Roles), default=Roles.USER)
     status = Column(Enum(UserStatus), default=UserStatus.INACTIVE)
 
-    sessions = relationship(
-        "Session",
-        back_populates="user"
-    )
-    sent_friendships = relationship(
-        "Friendship",
-        foreign_keys=[Friendship.requester_id],
-        back_populates="requester"
-    )
-    received_friendships = relationship(
-        "Friendship",
-        foreign_keys=[Friendship.receiver_id],
-        back_populates="receiver"
-    )
-    settings = relationship(
-        "UserSettings",
-        uselist=False,
-        back_populates="user"
-    )
+    sessions = relationship("Session", back_populates="user")
+    sent_friendships = relationship("Friendship", foreign_keys=[Friendship.requester_id], back_populates="requester")
+    received_friendships = relationship("Friendship", foreign_keys=[Friendship.receiver_id], back_populates="receiver")
+    settings = relationship("UserSettings", uselist=False, back_populates="user")
+    group_chats = relationship("GroupChatRoom", secondary=group_chat_users, back_populates="users")
+    group_chat_messages = relationship("GroupChatMessage", back_populates="sender")
 
     def __repr__(self):
         return f"User(id={self.id}, username={self.username}, email={self.email})"

@@ -8,9 +8,11 @@ from starlette.websockets import WebSocket
 from app import schemas
 from app.config import settings
 from app.database import get_db
+from app.models.group_chat_room import GroupChatRoom
 from app.models.user import User
-from app.schemas import UserProfile, UpdateUserFieldRequest, ResponseMessage, AvatarUpdate, SettingsURL, UserSettings
-from app.services.chat_services import get_chat_messages
+from app.schemas import UserProfile, UpdateUserFieldRequest, ResponseMessage, AvatarUpdate, SettingsURL, UserSettings, \
+    CreateGroupChatRequest
+from app.services.chat_services import get_chat_messages, create_group_chat_room
 from app.services.settings_services import get_user_profile
 from app.services.user_services import get_user_by_token, update_user_field, save_avatar, update_user_avatar
 from fastapi.security import OAuth2PasswordBearer
@@ -91,3 +93,44 @@ def get_users_info(user_ids: list[int], db: Session = Depends(get_db)):
     if not users:
         raise HTTPException(status_code=404, detail="Пользователи не найдены")
     return [{"id": user.id, "username": user.username, "filename": user.filename} for user in users]
+
+
+@router.post("/group_chat/create")
+async def create_group_chat(
+        request: CreateGroupChatRequest,
+        db: Session = Depends(get_db),
+        token: str = Depends(oauth2_scheme)
+):
+    user = get_current_user(token, db)
+
+    if not request.user_ids:
+        raise HTTPException(status_code=400, detail="Пользователя нема")
+
+    group_chat = create_group_chat_room(db, user.id, request.user_ids, request.group_name)
+
+    return {
+        "group_chat_id": group_chat.group_chat_id,
+        "group_name": group_chat.group_name,
+        "created_at": group_chat.created_at
+    }
+
+
+@router.get("/get_chat_rooms")
+async def get_chat_rooms(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    user = get_user_by_token(token, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    group_chats = db.query(GroupChatRoom).filter(GroupChatRoom.users.any(id=user.id)).all()
+
+    result = [
+        {
+            "group_chat_id": group_chat.group_chat_id,
+            "group_name": group_chat.group_name,
+            "created_at": group_chat.created_at,
+            "creator_id": group_chat.creator_id,
+        }
+        for group_chat in group_chats
+    ]
+
+    return result
