@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from starlette.websockets import WebSocket, WebSocketDisconnect
 from app.database import get_db
 from app.models.chat_message import MessageStatus
+from app.models.group_chat_room import GroupChatRoom
 from app.models.session import Session
 from app.models.user import User
 from app.services.chat_services import create_chat_room, send_message_and_notify, mark_messages_as_read, \
@@ -117,42 +118,58 @@ async def websocket_endpoint(
 
 @router.websocket("/ws/group_chat/{group_chat_id}")
 async def group_chat(
-        websocket: WebSocket,
-        group_chat_id: str,
-        token: str,
-        db: Session = Depends(get_db)
+    websocket: WebSocket,
+    group_chat_id: str,
+    token: str,
+    db: Session = Depends(get_db)
 ):
     user = get_user_by_token(token, db)
     if not user:
-        await websocket.close(code=4001, reason="Хуевый токен")
+        await websocket.close(code=4001, reason="Неверный токен")
         return
 
-    await manager.connect(websocket, str(user.ud))
+    group_chat = db.query(GroupChatRoom).filter(GroupChatRoom.group_chat_id == group_chat_id).first()
+    if not group_chat:
+        await websocket.close(code=404, reason="Групповой чат не найден")
+        return
+
+    await manager.connect(websocket, str(user.id))
 
     try:
         while True:
             data = await websocket.receive_json()
-            message_data = json.loads(data)
+
+            message_data = data
 
             if message_data.get("type") == "send_message":
                 text = message_data.get("text", "")
-                timestamp = message_data.get("time", datetime.utcnow())
+                group_chat_id = message_data.get("group_chat_id", "")
+                current_timestamp = datetime.utcnow()
 
-                message = send_group_message(
-                    db,
-                    group_chat_id,
-                    sender_id=str(user.id),
-                    text=text,
-                    timestamp=datetime.utcnow()
-                )
+                print(f"Received message from user {user.id}: {message_data}")
 
-                payload = json.dumps({
-                    "sender_id": str(user.id),
-                    "text": message.text,
-                    "timestamp": message.timestamp.isoformat()
-                })
+                try:
+                    message = send_group_message(
+                        db,
+                        group_chat_room_id=group_chat_id,
+                        sender_id=str(user.id),
+                        text=text,
+                        timestamp=current_timestamp
+                    )
 
-                await manager.broadcast(payload)
+                    payload = json.dumps(message)
+
+                    await manager.broadcast(payload)
+                except Exception as e:
+                    print(f"Error while sending group message: {e}")
+                    await websocket.close(code=4002, reason="Ошибка при отправке сообщения")
+                    break
+
 
     except WebSocketDisconnect:
+        manager.disconnect(str(user.id))
+    except Exception as e:
+        if not websocket.client_state.closed:
+            await websocket.close(code=4003, reason=str(e))
+    finally:
         manager.disconnect(str(user.id))

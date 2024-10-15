@@ -1,12 +1,14 @@
 import json
 import uuid
 from datetime import datetime
-from sqlalchemy import desc
+from typing import List
+from uuid import UUID
+
 from app.models.chat_message import ChatMessage, MessageStatus
 from app.models.chat_notification import ChatNotification
 from app.models.chat_room import ChatRoom
 from app.models.group_chat_room import GroupChatRoom
-from app.models.group_chat_message import GroupChatMessage
+from app.models.group_chat_message import GroupChatMessage, GroupChatStatus
 from app.models.session import Session
 from app.models.user import User
 
@@ -118,12 +120,12 @@ async def mark_messages_as_read(db: Session, chat_room_id: str, recipient_id: st
 """
 
 
-def create_group_chat_room(db: Session, creator_id: str, user_ids: list[str], group_name: str) -> GroupChatRoom:
+def create_group_chat_room(db: Session, creator_id: str, user_ids: List[str], group_name: str) -> GroupChatRoom:
     creator_id = str(creator_id)
     user_ids = [str(user_id) for user_id in user_ids]
 
     new_group_chat = GroupChatRoom(
-        group_chat_id=str(uuid.uuid4()),
+        group_chat_id=f"{group_name}",
         group_name=group_name,
         creator_id=creator_id,
         created_at=datetime.now()
@@ -146,8 +148,8 @@ def create_group_chat_room(db: Session, creator_id: str, user_ids: list[str], gr
     return new_group_chat
 
 
-def add_user_to_group_chat(db: Session, group_chat_id: str, user_id: str) -> GroupChatRoom:
-    group_chat = db.query(GroupChatRoom).filter(GroupChatRoom.id == group_chat_id).first()
+def add_user_to_group_chat(db: Session, group_chat_room_id: str, user_id: str) -> GroupChatRoom:
+    group_chat = db.query(GroupChatRoom).filter(GroupChatRoom.group_chat_id == group_chat_room_id).first()
 
     if group_chat:
         user = db.query(User).filter(User.id == user_id).first()
@@ -158,17 +160,63 @@ def add_user_to_group_chat(db: Session, group_chat_id: str, user_id: str) -> Gro
     return group_chat
 
 
-def send_group_message(db: Session, group_chat_id: str, sender_id: str, text: str, timestamp: datetime) -> GroupChatMessage:
+def send_group_message(db: Session, group_chat_room_id: str, sender_id: str, text: str, timestamp: datetime) -> dict:
     new_message = GroupChatMessage(
-        group_chat_id=group_chat_id,
+        group_chat_room_id=group_chat_room_id,
         sender_id=sender_id,
         text=text,
         timestamp=timestamp,
-        message_statuses=MessageStatus.SENT
+        message_status=GroupChatStatus.SENT
+    )
+    try:
+        db.add(new_message)
+        db.commit()
+        db.refresh(new_message)
+
+        sender = db.query(User).filter(User.id == sender_id).first()
+
+        avatar_url = f"http://127.0.0.1:8000/{sender.filename}".replace("\\", "/") if sender.filename else 'https://via.placeholder.com/50'
+
+        return {
+            "id": new_message.id,
+            "text": new_message.text,
+            "timestamp": new_message.timestamp.isoformat(),
+            "sender": {
+                "id": sender.id,
+                "username": sender.username,
+                "filename": avatar_url
+            }
+        }
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error saving message to the database: {e}")
+        raise e
+
+
+def get_chat_room_messages(db: Session, group_chat_room_id: str, offset: int = 0, limit: int = 100) -> List[dict]:
+    messages = (
+        db.query(GroupChatMessage, User.username, User.filename)
+        .join(User, GroupChatMessage.sender_id == User.id)
+        .filter(GroupChatMessage.group_chat_room_id == group_chat_room_id)
+        .order_by(GroupChatMessage.timestamp.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
     )
 
-    db.add(new_message)
-    db.commit()
-    db.refresh(new_message)
+    result = [
+        {
+            "id": message.id,
+            "text": message.text,
+            "timestamp": message.timestamp.isoformat(),
+            "sender": {
+                "id": message.sender_id,
+                "username": username,
+                "filename": f"http://127.0.0.1:8000/{filename}".replace("\\", "/") if filename else 'https://via.placeholder.com/50'
+            }
+        }
+        for message, username, filename in messages
+    ]
 
-    return new_message
+    return result

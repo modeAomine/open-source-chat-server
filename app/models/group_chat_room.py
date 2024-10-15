@@ -19,5 +19,5 @@ class GroupChatRoom(Base):
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    users = relationship("User", secondary=group_chat_users, back_populates="group_chats")
+    users = relationship("User", secondary="group_chat_users", back_populates="group_chats")
     messages = relationship("GroupChatMessage", back_populates="group_chat_room")

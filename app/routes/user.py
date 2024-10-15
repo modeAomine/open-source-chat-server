@@ -1,5 +1,6 @@
 import os
 from typing import List
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ from app.models.group_chat_room import GroupChatRoom
 from app.models.user import User
 from app.schemas import UserProfile, UpdateUserFieldRequest, ResponseMessage, AvatarUpdate, SettingsURL, UserSettings, \
     CreateGroupChatRequest
-from app.services.chat_services import get_chat_messages, create_group_chat_room
+from app.services.chat_services import get_chat_messages, create_group_chat_room, get_chat_room_messages
 from app.services.settings_services import get_user_profile
 from app.services.user_services import get_user_by_token, update_user_field, save_avatar, update_user_avatar
 from fastapi.security import OAuth2PasswordBearer
@@ -95,12 +96,44 @@ def get_users_info(user_ids: list[int], db: Session = Depends(get_db)):
     return [{"id": user.id, "username": user.username, "filename": user.filename} for user in users]
 
 
+@router.get("/get/group_chat_message/{group_chat_id}")
+async def get_group_chat_messages(group_chat_id: str, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    get_current_user(token, db)
+    group_chat_id = group_chat_id
+    messages = get_chat_room_messages(db, group_chat_id)
+    return messages
+
+
+@router.get("/get_chat_rooms")
+async def get_chat_rooms(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> list:
+    user = get_user_by_token(token, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    group_chats = db.query(GroupChatRoom).filter(GroupChatRoom.users.any(id=user.id)).all()
+
+    if not group_chats:
+        raise HTTPException(status_code=404, detail="Пользователь не состоит в групповых чатах")
+
+    result = [
+        {
+            "group_chat_id": group_chat.group_chat_id,
+            "group_name": group_chat.group_name,
+            "created_at": group_chat.created_at,
+            "creator_id": group_chat.creator_id,
+        }
+        for group_chat in group_chats
+    ]
+
+    return result
+
+
 @router.post("/group_chat/create")
 async def create_group_chat(
         request: CreateGroupChatRequest,
         db: Session = Depends(get_db),
         token: str = Depends(oauth2_scheme)
-):
+) -> dict:
     user = get_current_user(token, db)
 
     if not request.user_ids:
@@ -115,22 +148,32 @@ async def create_group_chat(
     }
 
 
-@router.get("/get_chat_rooms")
-async def get_chat_rooms(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    user = get_user_by_token(token, db)
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+@router.get("/get/group_chat_message/{group_chat_id}")
+async def get_group_chat_messages(
+        group_chat_id: str,
+        db: Session = Depends(get_db),
+        token: str = Depends(oauth2_scheme)
+) -> list:
+    get_current_user(token, db)
 
-    group_chats = db.query(GroupChatRoom).filter(GroupChatRoom.users.any(id=user.id)).all()
+    group_chat = db.query(GroupChatRoom).filter(GroupChatRoom.group_chat_id == group_chat_id).first()
+    if not group_chat:
+        raise HTTPException(status_code=404, detail="Групповой чат не найден")
+
+    messages = get_chat_room_messages(db, group_chat_id)
 
     result = [
         {
-            "group_chat_id": group_chat.group_chat_id,
-            "group_name": group_chat.group_name,
-            "created_at": group_chat.created_at,
-            "creator_id": group_chat.creator_id,
+            "id": message.id,
+            "text": message.text,
+            "timestamp": message.timestamp.isoformat(),
+            "sender": {
+                "id": message.sender.id,
+                "username": message.sender.username,
+                "filename": message.sender.filename
+            }
         }
-        for group_chat in group_chats
+        for message in messages
     ]
 
     return result

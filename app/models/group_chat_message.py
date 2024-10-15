@@ -1,3 +1,6 @@
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -15,7 +18,7 @@ class GroupChatMessage(Base):
     __tablename__ = "group_chat_message"
 
     id = Column(Integer, primary_key=True, index=True)
-    group_chat_room_id = Column(Integer, ForeignKey("group_chat_room.id"))
+    group_chat_room_id = Column(String, ForeignKey("group_chat_room.group_chat_id"))
     sender_id = Column(Integer, ForeignKey("users.id"))
     text = Column(String)
     timestamp = Column(DateTime, default=func.now())
@@ -24,3 +27,4 @@ class GroupChatMessage(Base):
 
     group_chat_room = relationship("GroupChatRoom", back_populates="messages")
     sender = relationship("User", back_populates="group_chat_messages")
+
